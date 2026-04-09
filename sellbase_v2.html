@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SellBase</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --green:#1D9E75;--green-dark:#0F6E56;--green-light:#E1F5EE;--green-text:#085041;
+    --blue-light:#E6F1FB;--blue-text:#185FA5;--amber:#EF9F27;--red:#E24B4A;
+    --bg:#F5F5F2;--surface:#FFFFFF;--border:rgba(0,0,0,0.1);--border-strong:rgba(0,0,0,0.2);
+    --text:#1a1a18;--text-muted:#6b6b68;--text-hint:#9a9a97;
+    --r-sm:8px;--r-md:12px;--r-lg:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;}
+  .header{background:var(--surface);border-bottom:.5px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
+  .logo{font-size:20px;font-weight:700;letter-spacing:-.5px;cursor:pointer;}.logo span{color:var(--green);}
+  .search-wrap{flex:1;display:flex;gap:8px;max-width:560px;}
+  .search-wrap input{flex:1;height:38px;border:.5px solid var(--border-strong);border-radius:var(--r-sm);padding:0 14px;font-size:14px;font-family:inherit;background:var(--bg);color:var(--text);outline:none;}
+  .search-wrap input:focus{border-color:var(--green);}
+  .btn-search{height:38px;padding:0 18px;background:var(--green);color:#fff;border:none;border-radius:var(--r-sm);font-size:14px;font-family:inherit;font-weight:500;cursor:pointer;}
+  .btn-sell{height:38px;padding:0 18px;background:var(--surface);color:var(--green);border:1.5px solid var(--green);border-radius:var(--r-sm);font-size:14px;font-family:inherit;font-weight:500;cursor:pointer;white-space:nowrap;}
+  .btn-login{height:38px;padding:0 18px;background:var(--green);color:#fff;border:none;border-radius:var(--r-sm);font-size:14px;font-family:inherit;font-weight:500;cursor:pointer;white-space:nowrap;}
+  .av{width:34px;height:34px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green-dark);flex-shrink:0;cursor:pointer;position:relative;}
+  .av-menu{position:absolute;top:42px;right:0;background:var(--surface);border:.5px solid var(--border-strong);border-radius:var(--r-md);padding:6px;min-width:140px;z-index:200;display:none;}
+  .av-menu.open{display:block;}
+  .av-menu a{display:block;padding:8px 12px;font-size:13px;color:var(--text);cursor:pointer;border-radius:var(--r-sm);}
+  .av-menu a:hover{background:var(--bg);}
+  .av-menu a.danger{color:var(--red);}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:var(--r-md);font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .cats{background:var(--surface);border-bottom:.5px solid var(--border);padding:8px 20px;display:flex;gap:6px;overflow-x:auto;}
+  .cats::-webkit-scrollbar{display:none;}
+  .cat{padding:5px 14px;border-radius:20px;border:.5px solid var(--border-strong);font-size:12px;color:var(--text-muted);cursor:pointer;white-space:nowrap;background:var(--surface);font-family:inherit;}
+  .cat:hover,.cat.active{background:var(--green);color:#fff;border-color:var(--green);}
+  #list-page{display:flex;}
+  .sidebar{width:200px;flex-shrink:0;padding:16px 14px;border-right:.5px solid var(--border);background:var(--surface);min-height:calc(100vh - 96px);}
+  .sidebar h3{font-size:11px;font-weight:700;color:var(--text-hint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+  .fg{margin-bottom:20px;}
+  .fr{display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;}
+  .fr input[type=checkbox]{accent-color:var(--green);width:14px;height:14px;flex-shrink:0;}
+  .fr span{font-size:13px;color:var(--text);}
+  .pr{display:flex;gap:6px;align-items:center;margin-top:6px;}
+  .pr input{width:72px;height:30px;border:.5px solid var(--border-strong);border-radius:var(--r-sm);padding:0 8px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--text);outline:none;}
+  .pr span{font-size:12px;color:var(--text-muted);}
+  .main{flex:1;padding:16px 20px;}
+  .top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .rc{font-size:13px;color:var(--text-muted);}
+  .ctrls{display:flex;gap:8px;align-items:center;}
+  .vt{display:flex;border:.5px solid var(--border-strong);border-radius:var(--r-sm);overflow:hidden;}
+  .vb{width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--surface);color:var(--text-muted);border:none;}
+  .vb.active{background:var(--bg);color:var(--text);}
+  .ss{height:30px;border:.5px solid var(--border-strong);border-radius:var(--r-sm);padding:0 10px;font-size:12px;font-family:inherit;background:var(--surface);color:var(--text);outline:none;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;}
+  .card{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-md);overflow:hidden;cursor:pointer;transition:border-color .15s,transform .1s;}
+  .card:hover{border-color:var(--border-strong);transform:translateY(-1px);}
+  .ci{aspect-ratio:1;background:var(--bg);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+  .ci img{width:100%;height:100%;object-fit:cover;}
+  .ci .ni{font-size:44px;}
+  .badge{position:absolute;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;}
+  .badge-new{top:8px;left:8px;background:var(--green);color:#fff;}
+  .badge-sold{top:0;left:0;right:0;bottom:0;border-radius:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;}
+  .cb{padding:8px 10px 10px;}
+  .ct{font-size:12px;color:var(--text);line-height:1.5;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .cp{font-size:15px;font-weight:700;margin-bottom:5px;}
+  .cm{display:flex;align-items:center;justify-content:space-between;}
+  .cs{font-size:11px;color:var(--text-hint);}
+  .lb{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-hint);cursor:pointer;background:none;border:none;font-family:inherit;padding:0;}
+  .lb.liked{color:var(--red);}
+  .lb svg{width:12px;height:12px;stroke-width:1.5;}
+  .lm .grid{grid-template-columns:1fr;}
+  .lm .card{display:flex;flex-direction:row;}
+  .lm .ci{width:88px;height:88px;aspect-ratio:auto;flex-shrink:0;}
+  .empty{text-align:center;padding:60px 20px;color:var(--text-muted);}
+  .loading{text-align:center;padding:40px;color:var(--text-muted);font-size:13px;}
+  .pag{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:24px;padding-top:18px;border-top:.5px solid var(--border);}
+  .pb{width:32px;height:32px;border:.5px solid var(--border-strong);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;background:var(--surface);color:var(--text);font-family:inherit;}
+  .pb.active{background:var(--green);color:#fff;border-color:var(--green);}
+  .pb:disabled{opacity:.4;cursor:not-allowed;}
+  #detail-page{display:none;}
+  .di{max-width:860px;margin:0 auto;padding:16px 20px 48px;}
+  .bc{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);margin-bottom:16px;}
+  .bc a{color:var(--text-muted);cursor:pointer;text-decoration:none;}.bc a:hover{color:var(--green);}
+  .bc span{color:var(--text-hint);}
+  .dl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;}
+  .im{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-md);aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:100px;position:relative;overflow:hidden;}
+  .im img{width:100%;height:100%;object-fit:cover;}
+  .ic{position:absolute;top:12px;right:12px;background:var(--green-light);color:var(--green-text);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;}
+  .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}
+  .ti{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-sm);aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;overflow:hidden;}
+  .ti img{width:100%;height:100%;object-fit:cover;}
+  .ti.active{border:2px solid var(--green);}
+  .dinfo{display:flex;flex-direction:column;gap:14px;}
+  .tags{display:flex;gap:6px;flex-wrap:wrap;}
+  .tag{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;}
+  .tag-c{background:var(--bg);color:var(--text-muted);border:.5px solid var(--border-strong);}
+  .tag-s{background:var(--blue-light);color:var(--blue-text);}
+  .tag-st{background:var(--green-light);color:var(--green-text);}
+  .dt{font-size:17px;font-weight:700;line-height:1.5;}
+  .dpr{display:flex;align-items:baseline;gap:8px;}
+  .dp{font-size:30px;font-weight:700;letter-spacing:-1px;}
+  .dpn{font-size:12px;color:var(--text-muted);}
+  .btn-buy{width:100%;height:46px;background:var(--green);color:#fff;border:none;border-radius:var(--r-md);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;}
+  .btn-buy:hover{background:var(--green-dark);}
+  .btn-offer{width:100%;height:40px;background:var(--surface);color:var(--text);border:.5px solid var(--border-strong);border-radius:var(--r-md);font-size:14px;font-family:inherit;cursor:pointer;margin-top:8px;}
+  .btn-offer:hover{background:var(--bg);}
+  .lrd{display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:4px 0;}
+  .lrd svg{width:16px;height:16px;stroke:var(--text-hint);fill:none;stroke-width:1.5;}
+  .lrd.liked svg{stroke:var(--red);fill:var(--red);}
+  .lrd span{font-size:13px;color:var(--text-muted);}
+  .divider{height:.5px;background:var(--border);}
+  .sr{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:.5px solid var(--border);}
+  .sr:last-child{border-bottom:none;}
+  .sl{font-size:13px;color:var(--text-muted);}
+  .sv{font-size:13px;font-weight:500;}
+  .sc{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-md);padding:14px;}
+  .selrow{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .sav{width:40px;height:40px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--green-dark);flex-shrink:0;}
+  .sn{font-size:14px;font-weight:700;}
+  .sm{font-size:12px;color:var(--text-muted);margin-top:2px;}
+  .stars{color:var(--amber);}
+  .btn-msg{width:100%;height:36px;border:.5px solid var(--border-strong);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font-size:13px;font-family:inherit;cursor:pointer;}
+  .btn-msg:hover{background:var(--bg);}
+  .cs2{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-md);padding:16px 18px;margin-top:18px;}
+  .cs2 h2{font-size:14px;font-weight:700;margin-bottom:12px;}
+  .desc-t{font-size:13px;color:var(--text-muted);line-height:1.9;white-space:pre-wrap;}
+  .cmt{display:flex;gap:10px;padding:12px 0;border-bottom:.5px solid var(--border);}
+  .cmt:last-of-type{border-bottom:none;}
+  .cav{width:30px;height:30px;border-radius:50%;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--green-dark);flex-shrink:0;}
+  .cu{font-size:12px;font-weight:700;}
+  .ctxt{font-size:12px;color:var(--text-muted);margin-top:2px;line-height:1.6;}
+  .ctm{font-size:11px;color:var(--text-hint);margin-top:3px;}
+  .cf{display:flex;gap:8px;margin-top:12px;}
+  .cf input{flex:1;height:36px;border:.5px solid var(--border-strong);border-radius:var(--r-sm);padding:0 12px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text);outline:none;}
+  .cf input:focus{border-color:var(--green);}
+  .cf button{height:36px;padding:0 14px;background:var(--green);color:#fff;border:none;border-radius:var(--r-sm);font-size:13px;font-family:inherit;font-weight:500;cursor:pointer;}
+  #listing-page{display:none;max-width:600px;margin:0 auto;padding:24px 20px 48px;}
+  .fs{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-lg);padding:20px;margin-bottom:16px;}
+  .fs h2{font-size:15px;font-weight:700;margin-bottom:16px;}
+  .form-row{margin-bottom:14px;}
+  .form-row label{font-size:13px;color:var(--text-muted);display:block;margin-bottom:6px;}
+  .form-row input,.form-row textarea,.form-row select{width:100%;border:.5px solid var(--border-strong);border-radius:var(--r-sm);padding:0 12px;font-size:14px;font-family:inherit;background:var(--bg);color:var(--text);outline:none;height:40px;}
+  .form-row textarea{height:120px;padding:10px 12px;resize:vertical;}
+  .form-row input:focus,.form-row textarea:focus,.form-row select:focus{border-color:var(--green);}
+  .upa{border:1.5px dashed var(--border-strong);border-radius:var(--r-md);padding:32px;text-align:center;cursor:pointer;background:var(--bg);}
+  .upa:hover{border-color:var(--green);}
+  .upa p{font-size:13px;color:var(--text-muted);margin-top:8px;}
+  .ip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}
+  .ipv{aspect-ratio:1;border-radius:var(--r-sm);overflow:hidden;position:relative;background:var(--bg);}
+  .ipv img{width:100%;height:100%;object-fit:cover;}
+  .ipv .ri{position:absolute;top:4px;right:4px;width:20px;height:20px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .btn-sub{width:100%;height:46px;background:var(--green);color:#fff;border:none;border-radius:var(--r-md);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;}
+  .btn-sub:hover{background:var(--green-dark);}
+  .btn-sub:disabled{background:var(--text-hint);cursor:not-allowed;}
+  .mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;align-items:center;justify-content:center;padding:20px;}
+  .mo.open{display:flex;}
+  .modal{background:var(--surface);border-radius:var(--r-lg);padding:28px;width:100%;max-width:380px;position:relative;}
+  .modal h2{font-size:18px;font-weight:700;margin-bottom:4px;}
+  .msub{font-size:13px;color:var(--text-muted);margin-bottom:20px;}
+  .mtabs{display:flex;border:.5px solid var(--border-strong);border-radius:var(--r-sm);overflow:hidden;margin-bottom:20px;}
+  .mtab{flex:1;height:36px;border:none;background:var(--surface);font-size:13px;font-family:inherit;cursor:pointer;color:var(--text-muted);}
+  .mtab.active{background:var(--green);color:#fff;font-weight:500;}
+  .mr{margin-bottom:14px;}
+  .mr label{font-size:13px;color:var(--text-muted);display:block;margin-bottom:6px;}
+  .mr input{width:100%;height:40px;border:.5px solid var(--border-strong);border-radius:var(--r-sm);padding:0 12px;font-size:14px;font-family:inherit;outline:none;background:var(--bg);color:var(--text);}
+  .mr input:focus{border-color:var(--green);}
+  .btn-auth{width:100%;height:44px;background:var(--green);color:#fff;border:none;border-radius:var(--r-md);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:4px;}
+  .btn-auth:hover{background:var(--green-dark);}
+  .btn-auth:disabled{background:var(--text-hint);cursor:not-allowed;}
+  .mclose{position:absolute;top:16px;right:16px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-muted);}
+  .ma{display:flex;gap:8px;margin-top:20px;}
+  .ma button{flex:1;height:40px;border-radius:var(--r-sm);font-size:14px;font-family:inherit;font-weight:500;cursor:pointer;}
+  .btn-cancel{background:var(--bg);color:var(--text);border:.5px solid var(--border-strong);}
+  .btn-confirm{background:var(--green);color:#fff;border:none;}
+  #purchase-page{display:none;max-width:500px;margin:0 auto;padding:24px 20px 48px;}
+  .pc{background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-lg);padding:20px;}
+  .pitm{display:flex;gap:14px;align-items:center;padding-bottom:16px;border-bottom:.5px solid var(--border);margin-bottom:16px;}
+  .pii{width:64px;height:64px;background:var(--bg);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;overflow:hidden;}
+  .pii img{width:100%;height:100%;object-fit:cover;}
+  .purrow{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;}
+  .purrow.total{font-size:16px;font-weight:700;border-top:.5px solid var(--border);margin-top:8px;padding-top:12px;}
+  .purrow span:first-child{color:var(--text-muted);}
+  .btn-pur{width:100%;height:46px;background:var(--green);color:#fff;border:none;border-radius:var(--r-md);font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:16px;}
+  .btn-pur:hover{background:var(--green-dark);}
+  .btn-back-p{width:100%;height:38px;background:var(--bg);color:var(--text);border:.5px solid var(--border-strong);border-radius:var(--r-md);font-size:14px;font-family:inherit;cursor:pointer;margin-top:8px;}
+  @media(max-width:600px){.dl{grid-template-columns:1fr;}.sidebar{display:none;}}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<header class="header">
+  <div class="logo" onclick="showList()">Sell<span>Base</span></div>
+  <div class="search-wrap">
+    <input type="text" id="search-input" placeholder="商品を探す...">
+    <button class="btn-search" onclick="doSearch()">検索</button>
+  </div>
+  <div id="header-auth"><button class="btn-login" onclick="openAuth()">ログイン / 登録</button></div>
+</header>
+
+<nav class="cats">
+  <button class="cat active" onclick="setCat(this,'')">すべて</button>
+  <button class="cat" onclick="setCat(this,'電子機器')">電子機器</button>
+  <button class="cat" onclick="setCat(this,'ファッション')">ファッション</button>
+  <button class="cat" onclick="setCat(this,'本・雑誌')">本・雑誌</button>
+  <button class="cat" onclick="setCat(this,'スポーツ')">スポーツ</button>
+  <button class="cat" onclick="setCat(this,'ホビー')">ホビー</button>
+  <button class="cat" onclick="setCat(this,'家電')">家電</button>
+  <button class="cat" onclick="setCat(this,'インテリア')">インテリア</button>
+  <button class="cat" onclick="setCat(this,'その他')">その他</button>
+</nav>
+
+<!-- LIST -->
+<div id="list-page">
+  <aside class="sidebar">
+    <div class="fg"><h3>価格</h3><div class="pr"><input type="number" id="pmin" placeholder="最低"><span>〜</span><input type="number" id="pmax" placeholder="最高"></div></div>
+    <div class="fg">
+      <h3>状態</h3>
+      <label class="fr"><input type="checkbox" class="cf2" value="新品・未使用" checked><span>新品・未使用</span></label>
+      <label class="fr"><input type="checkbox" class="cf2" value="ほぼ未使用" checked><span>ほぼ未使用</span></label>
+      <label class="fr"><input type="checkbox" class="cf2" value="やや傷あり" checked><span>やや傷あり</span></label>
+      <label class="fr"><input type="checkbox" class="cf2" value="傷・汚れあり"><span>傷・汚れあり</span></label>
+    </div>
+    <div class="fg"><h3>配送</h3><label class="fr"><input type="checkbox" id="fship"><span>送料込みのみ</span></label></div>
+    <button onclick="loadProducts()" style="width:100%;height:36px;background:var(--green);color:#fff;border:none;border-radius:var(--r-sm);font-size:13px;font-family:inherit;cursor:pointer;margin-top:4px;">絞り込む</button>
+  </aside>
+  <main class="main">
+    <div class="top-bar">
+      <span class="rc" id="rc">読み込み中...</span>
+      <div class="ctrls">
+        <div class="vt">
+          <button class="vb active" id="gb" onclick="setView('grid')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg></button>
+          <button class="vb" id="lb2" onclick="setView('list')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="1" y1="3.5" x2="13" y2="3.5"/><line x1="1" y1="7" x2="13" y2="7"/><line x1="1" y1="10.5" x2="13" y2="10.5"/></svg></button>
+        </div>
+        <select class="ss" id="sort" onchange="loadProducts()">
+          <option value="created_at|desc">新着順</option>
+          <option value="price|asc">価格が安い順</option>
+          <option value="price|desc">価格が高い順</option>
+          <option value="like_count|desc">いいね順</option>
+        </select>
+      </div>
+    </div>
+    <div id="pg" class="grid"></div>
+    <div class="pag" id="pag"></div>
+  </main>
+</div>
+
+<!-- DETAIL -->
+<div id="detail-page">
+  <div class="di">
+    <div class="bc"><a onclick="showList()">← 一覧に戻る</a><span>/</span><span id="dcat"></span></div>
+    <div class="dl">
+      <div>
+        <div class="im" id="dim"></div>
+        <div class="thumbs" id="dthumbs"></div>
+      </div>
+      <div class="dinfo">
+        <div class="tags"><span class="tag tag-c" id="dtag-c"></span><span class="tag tag-s" id="dtag-s"></span><span class="tag tag-st" id="dtag-st"></span></div>
+        <h1 class="dt" id="dtitle"></h1>
+        <div class="dpr"><span class="dp" id="dprice"></span><span class="dpn">（税込）</span></div>
+        <div id="dactions"></div>
+        <div class="divider"></div>
+        <div id="dspecs"></div>
+        <div class="sc" id="dseller"></div>
+      </div>
+    </div>
+    <div class="cs2"><h2>商品説明</h2><p class="desc-t" id="ddesc"></p></div>
+    <div class="cs2">
+      <h2>コメント <span id="ccnt" style="font-size:12px;font-weight:400;color:var(--text-muted);"></span></h2>
+      <div id="clist"></div>
+      <div id="cform"></div>
+    </div>
+  </div>
+</div>
+
+<!-- LISTING -->
+<div id="listing-page">
+  <a onclick="showList()" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer;margin-bottom:16px;padding:16px 20px 0;">← 一覧に戻る</a>
+  <div style="max-width:600px;margin:0 auto;padding:0 20px 48px;">
+    <div class="fs">
+      <h2>商品を出品する</h2>
+      <div class="form-row">
+        <label>商品画像（最大4枚）</label>
+        <div class="upa" onclick="document.getElementById('fii').click()">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-hint)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <p>クリックして画像を追加</p>
+        </div>
+        <input type="file" id="fii" accept="image/*" multiple style="display:none" onchange="onImgSelect(event)">
+        <div class="ip" id="ipv"></div>
+      </div>
+      <div class="form-row"><label>商品名 <span style="color:var(--red)">*</span></label><input type="text" id="ltitle" placeholder="例：AirPods Pro 第2世代 ほぼ未使用"></div>
+      <div class="form-row"><label>商品説明</label><textarea id="ldesc" placeholder="状態・付属品・使用期間など詳しく書くと売れやすくなります"></textarea></div>
+      <div class="form-row"><label>カテゴリ <span style="color:var(--red)">*</span></label>
+        <select id="lcat"><option value="">選択してください</option><option>電子機器</option><option>ファッション</option><option>本・雑誌</option><option>スポーツ</option><option>ホビー</option><option>家電</option><option>インテリア</option><option>その他</option></select>
+      </div>
+      <div class="form-row"><label>商品の状態 <span style="color:var(--red)">*</span></label>
+        <select id="lcond"><option value="">選択してください</option><option>新品・未使用</option><option>ほぼ未使用</option><option>やや傷あり</option><option>傷・汚れあり</option></select>
+      </div>
+      <div class="form-row"><label>販売価格（円） <span style="color:var(--red)">*</span></label><input type="number" id="lprice" placeholder="例：22000" min="1"></div>
+      <div class="form-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="lship" checked style="accent-color:var(--green);width:16px;height:16px;">送料込み（出品者負担）</label></div>
+      <button class="btn-sub" id="lbtn" onclick="submitListing()">出品する</button>
+    </div>
+  </div>
+</div>
+
+<!-- PURCHASE -->
+<div id="purchase-page">
+  <div style="max-width:500px;margin:0 auto;padding:24px 20px 48px;">
+    <a onclick="showDetail(currentPid)" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer;margin-bottom:16px;">← 商品詳細に戻る</a>
+    <div class="pc">
+      <h2 style="font-size:16px;font-weight:700;margin-bottom:16px;">購入確認</h2>
+      <div class="pitm"><div class="pii" id="pimg"></div><div><div style="font-size:14px;font-weight:700;margin-bottom:4px;" id="ptitle"></div><div style="font-size:12px;color:var(--text-muted);" id="psub"></div></div></div>
+      <div class="purrow"><span>商品代金</span><span id="pprice"></span></div>
+      <div class="purrow"><span>配送料</span><span id="pship"></span></div>
+      <div class="purrow total"><span>合計</span><span id="ptotal"></span></div>
+      <button class="btn-pur" onclick="completePurchase()">購入を確定する</button>
+      <button class="btn-back-p" onclick="showDetail(currentPid)">戻る</button>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="mo" id="auth-mo">
+  <div class="modal">
+    <button class="mclose" onclick="closeAuth()">×</button>
+    <h2>アカウント</h2><p class="msub">SellBaseへようこそ</p>
+    <div class="mtabs">
+      <button class="mtab active" id="tab-in" onclick="switchTab('login')">ログイン</button>
+      <button class="mtab" id="tab-up" onclick="switchTab('register')">新規登録</button>
+    </div>
+    <div id="reg-fields" style="display:none;"><div class="mr"><label>ユーザー名</label><input type="text" id="a-uname" placeholder="例：apple_fan"></div></div>
+    <div class="mr"><label>メールアドレス</label><input type="email" id="a-email" placeholder="example@email.com"></div>
+    <div class="mr"><label>パスワード</label><input type="password" id="a-pass" placeholder="6文字以上"></div>
+    <button class="btn-auth" id="a-btn" onclick="submitAuth()">ログイン</button>
+  </div>
+</div>
+
+<!-- OFFER MODAL -->
+<div class="mo" id="offer-mo">
+  <div class="modal" style="max-width:400px;">
+    <h2>値下げ交渉</h2>
+    <div class="mr" style="margin-top:16px;"><label>現在の価格</label><input type="text" id="ocur" readonly style="color:var(--text-muted);"></div>
+    <div class="mr"><label>希望価格（円）</label><input type="number" id="oprice" placeholder="例：20000"></div>
+    <div class="mr"><label>メッセージ（任意）</label><input type="text" id="omsg" placeholder="一言添えると承認されやすいです"></div>
+    <div class="ma">
+      <button class="btn-cancel" onclick="document.getElementById('offer-mo').classList.remove('open')">キャンセル</button>
+      <button class="btn-confirm" onclick="submitOffer()">交渉を送る</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SURL='https://qoaaadinpfflwgppkjcm.supabase.co';
+const SKEY='sb_publishable_RzOm-DrVnbJ-_lA9XDBJgA_i-u-oVCf';
+const {createClient}=supabase;
+const sb=createClient(SURL,SKEY);
+
+let user=null,profile=null,currentPid=null,currentProduct=null;
+let currentCat='',currentPage=1,authMode='login';
+const PS=12;
+let uploadedFiles=[];
+
+(async()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  if(session) await setUser(session.user);
+  loadProducts();
+  sb.auth.onAuthStateChange(async(e,s)=>{
+    if(s) await setUser(s.user);
+    else{user=null;profile=null;renderHeader();}
+  });
+})();
+
+async function setUser(u){
+  user=u;
+  const {data}=await sb.from('profiles').select('*').eq('id',u.id).single();
+  profile=data;
+  renderHeader();
+}
+
+function renderHeader(){
+  const el=document.getElementById('header-auth');
+  if(user&&profile){
+    el.innerHTML=`<div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn-sell" onclick="requireAuth(showListing)">出品する</button>
+      <div class="av" onclick="toggleAv()">${profile.username.slice(0,2).toUpperCase()}
+        <div class="av-menu" id="av-menu">
+          <a onclick="closeAv()">マイページ（準備中）</a>
+          <a onclick="closeAv();doLogout()" class="danger">ログアウト</a>
+        </div>
+      </div></div>`;
+  } else {
+    el.innerHTML=`<button class="btn-login" onclick="openAuth()">ログイン / 登録</button>`;
+  }
+}
+
+async function loadProducts(){
+  document.getElementById('pg').innerHTML='<div class="loading">読み込み中...</div>';
+  const sv=document.getElementById('sort').value.split('|');
+  let q=sb.from('products').select('*,profiles(username,rating)',{count:'exact'})
+    .eq('status','販売中').order(sv[0],{ascending:sv[1]==='asc'})
+    .range((currentPage-1)*PS,currentPage*PS-1);
+  if(currentCat) q=q.eq('category',currentCat);
+  const mn=parseInt(document.getElementById('pmin').value);
+  const mx=parseInt(document.getElementById('pmax').value);
+  if(!isNaN(mn)) q=q.gte('price',mn);
+  if(!isNaN(mx)) q=q.lte('price',mx);
+  const conds=[...document.querySelectorAll('.cf2:checked')].map(e=>e.value);
+  if(conds.length>0&&conds.length<4) q=q.in('condition',conds);
+  if(document.getElementById('fship').checked) q=q.eq('shipping_included',true);
+  const {data,count,error}=await q;
+  if(error){toast('データの取得に失敗しました');return;}
+  document.getElementById('rc').textContent=`${count||0}件の商品`;
+  renderGrid(data||[]);
+  renderPag(count||0);
+}
+
+function renderGrid(prods){
+  const g=document.getElementById('pg');
+  if(!prods.length){g.innerHTML='<div class="empty"><p>商品が見つかりませんでした</p></div>';return;}
+  g.innerHTML=prods.map(p=>{
+    const img=p.image_urls&&p.image_urls.length>0?`<img src="${p.image_urls[0]}" alt="">`:'<span class="ni">📦</span>';
+    return `<div class="card" onclick="showDetail('${p.id}')">
+      <div class="ci">${img}${p.status==='売り切れ'?'<div class="badge badge-sold">売り切れ</div>':''}</div>
+      <div class="cb">
+        <div class="ct">${p.title}</div>
+        <div class="cp">¥${p.price.toLocaleString()}</div>
+        <div class="cm">
+          <span class="cs">${p.profiles?.username||''}</span>
+          <button class="lb" onclick="event.stopPropagation();handleLike('${p.id}',this)">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M8 13.5C8 13.5 1.5 9.5 1.5 5.5C1.5 3.5 3 2 5 2C6.2 2 7.2 2.7 8 3.6C8.8 2.7 9.8 2 11 2C13 2 14.5 3.5 14.5 5.5C14.5 9.5 8 13.5 8 13.5Z"/></svg>
+            ${p.like_count||0}
+          </button>
+        </div>
+      </div></div>`;
+  }).join('');
+}
+
+function renderPag(total){
+  const tp=Math.ceil(total/PS);
+  if(tp<=1){document.getElementById('pag').innerHTML='';return;}
+  let h=`<button class="pb" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  for(let i=1;i<=tp;i++) h+=`<button class="pb ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+  h+=`<button class="pb" onclick="goPage(${currentPage+1})" ${currentPage===tp?'disabled':''}>›</button>`;
+  document.getElementById('pag').innerHTML=h;
+}
+
+function goPage(n){if(n<1)return;currentPage=n;loadProducts();window.scrollTo(0,0);}
+
+async function showDetail(id){
+  currentPid=id;showPage('detail-page');
+  const {data:p,error}=await sb.from('products').select('*,profiles(username,rating,rating_count)').eq('id',id).single();
+  if(error||!p){toast('商品が見つかりませんでした');showList();return;}
+  currentProduct=p;
+  document.getElementById('dcat').textContent=p.category;
+  document.getElementById('dtitle').textContent=p.title;
+  document.getElementById('dprice').textContent='¥'+p.price.toLocaleString();
+  document.getElementById('dtag-c').textContent=p.condition;
+  document.getElementById('dtag-s').textContent=p.shipping_included?'送料込み':'着払い';
+  document.getElementById('dtag-st').textContent=p.status;
+  document.getElementById('ddesc').textContent=p.description||'説明なし';
+  const imgs=p.image_urls&&p.image_urls.length>0?p.image_urls:null;
+  document.getElementById('dim').innerHTML=imgs?`<img src="${imgs[0]}" alt=""><div class="ic">${p.condition}</div>`:`<span>📦</span><div class="ic">${p.condition}</div>`;
+  document.getElementById('dthumbs').innerHTML=imgs?imgs.map((u,i)=>`<div class="ti ${i===0?'active':''}" onclick="swImg(this,'${u}')"><img src="${u}" alt=""></div>`).join(''):'';
+  document.getElementById('dspecs').innerHTML=[['カテゴリ',p.category],['状態',p.condition],['配送料',p.shipping_included?'送料込み':'着払い'],['出品日',new Date(p.created_at).toLocaleDateString('ja-JP')]].map(([l,v])=>`<div class="sr"><span class="sl">${l}</span><span class="sv">${v}</span></div>`).join('');
+  const sel=p.profiles;
+  document.getElementById('dseller').innerHTML=`<div class="selrow"><div class="sav">${(sel?.username||'??').slice(0,2).toUpperCase()}</div><div><div class="sn">${sel?.username||'不明'}</div><div class="sm"><span class="stars">★</span> ${sel?.rating||5.0}　評価 ${sel?.rating_count||0}件</div></div></div><button class="btn-msg" onclick="requireAuth(()=>toast('メッセージ機能は近日公開予定です'))">メッセージを送る</button>`;
+  const isMine=user&&user.id===p.seller_id;
+  const isSold=p.status==='売り切れ';
+  document.getElementById('dactions').innerHTML=isMine?`<div style="background:var(--bg);border-radius:var(--r-md);padding:12px;text-align:center;font-size:13px;color:var(--text-muted);">自分の出品商品です</div>`:isSold?`<div style="background:var(--bg);border-radius:var(--r-md);padding:12px;text-align:center;font-size:13px;color:var(--text-muted);">この商品は売り切れです</div>`:`<button class="btn-buy" onclick="requireAuth(doShowPurchase)">購入する</button><button class="btn-offer" onclick="requireAuth(doOpenOffer)">値下げ交渉する</button><div class="lrd" id="dlrd" onclick="requireAuth(()=>handleLikeDetail('${p.id}'))"><svg viewBox="0 0 16 16"><path d="M8 13.5C8 13.5 1.5 9.5 1.5 5.5C1.5 3.5 3 2 5 2C6.2 2 7.2 2.7 8 3.6C8.8 2.7 9.8 2 11 2C13 2 14.5 3.5 14.5 5.5C14.5 9.5 8 13.5 8 13.5Z"/></svg><span>${p.like_count||0} いいね</span></div>`;
+  loadComments(id);
+  document.getElementById('cform').innerHTML=user?`<div class="cf"><input type="text" id="cin" placeholder="コメントを入力..."><button onclick="postComment()">送信</button></div>`:`<p style="font-size:13px;color:var(--text-muted);margin-top:12px;">コメントするには<a onclick="openAuth()" style="color:var(--green);cursor:pointer;">ログイン</a>してください</p>`;
+}
+
+async function loadComments(pid){
+  const {data}=await sb.from('comments').select('*,profiles(username)').eq('product_id',pid).order('created_at',{ascending:true});
+  document.getElementById('ccnt').textContent=`${(data||[]).length}件`;
+  document.getElementById('clist').innerHTML=(data||[]).map(c=>`<div class="cmt"><div class="cav">${(c.profiles?.username||'?').slice(0,2).toUpperCase()}</div><div><div class="cu">${c.profiles?.username||'不明'}</div><div class="ctxt">${c.body}</div><div class="ctm">${new Date(c.created_at).toLocaleString('ja-JP')}</div></div></div>`).join('')||'<p style="font-size:13px;color:var(--text-muted);padding:8px 0;">まだコメントはありません</p>';
+}
+
+async function postComment(){
+  if(!user){openAuth();return;}
+  const inp=document.getElementById('cin');
+  const body=inp.value.trim();if(!body)return;
+  const {error}=await sb.from('comments').insert({product_id:currentPid,user_id:user.id,body});
+  if(error){toast('送信に失敗しました');return;}
+  inp.value='';loadComments(currentPid);
+}
+
+function swImg(el,url){
+  document.querySelectorAll('.ti').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const m=document.getElementById('dim').querySelector('img');
+  if(m) m.src=url;
+}
+
+async function handleLike(pid,btn){
+  if(!user){openAuth();return;}
+  const {data:ex}=await sb.from('likes').select('id').eq('user_id',user.id).eq('product_id',pid).maybeSingle();
+  const {data:p}=await sb.from('products').select('like_count').eq('id',pid).single();
+  const cnt=p?.like_count||0;
+  if(ex){
+    await sb.from('likes').delete().eq('id',ex.id);
+    await sb.from('products').update({like_count:Math.max(0,cnt-1)}).eq('id',pid);
+    btn.classList.remove('liked');btn.lastChild.textContent=' '+(Math.max(0,cnt-1));
+  } else {
+    await sb.from('likes').insert({user_id:user.id,product_id:pid});
+    await sb.from('products').update({like_count:cnt+1}).eq('id',pid);
+    btn.classList.add('liked');btn.lastChild.textContent=' '+(cnt+1);
+  }
+}
+
+async function handleLikeDetail(pid){
+  if(!user){openAuth();return;}
+  const {data:ex}=await sb.from('likes').select('id').eq('user_id',user.id).eq('product_id',pid).maybeSingle();
+  const el=document.getElementById('dlrd');
+  const cnt=currentProduct?.like_count||0;
+  if(ex){
+    await sb.from('likes').delete().eq('id',ex.id);
+    await sb.from('products').update({like_count:Math.max(0,cnt-1)}).eq('id',pid);
+    el.classList.remove('liked');el.querySelector('span').textContent=Math.max(0,cnt-1)+' いいね';
+    if(currentProduct) currentProduct.like_count=Math.max(0,cnt-1);
+  } else {
+    await sb.from('likes').insert({user_id:user.id,product_id:pid});
+    await sb.from('products').update({like_count:cnt+1}).eq('id',pid);
+    el.classList.add('liked');el.querySelector('span').textContent=(cnt+1)+' いいね';
+    if(currentProduct) currentProduct.like_count=cnt+1;
+  }
+}
+
+function doShowPurchase(){
+  if(!currentProduct)return;
+  document.getElementById('ptitle').textContent=currentProduct.title;
+  document.getElementById('psub').textContent=currentProduct.condition;
+  document.getElementById('pprice').textContent='¥'+currentProduct.price.toLocaleString();
+  document.getElementById('pship').textContent=currentProduct.shipping_included?'¥0（送料込み）':'別途';
+  document.getElementById('ptotal').textContent='¥'+currentProduct.price.toLocaleString();
+  const imgs=currentProduct.image_urls;
+  document.getElementById('pimg').innerHTML=imgs&&imgs.length>0?`<img src="${imgs[0]}" alt="">`:'📦';
+  showPage('purchase-page');
+}
+
+async function completePurchase(){
+  if(!user||!currentProduct)return;
+  const {error}=await sb.from('transactions').insert({product_id:currentProduct.id,buyer_id:user.id,seller_id:currentProduct.seller_id,amount:currentProduct.price,status:'pending'});
+  if(error){toast('購入処理に失敗しました');return;}
+  await sb.from('products').update({status:'売り切れ'}).eq('id',currentProduct.id);
+  toast('✅ 購入が完了しました！');showList();loadProducts();
+}
+
+function doOpenOffer(){
+  if(!currentProduct)return;
+  document.getElementById('ocur').value='¥'+currentProduct.price.toLocaleString();
+  document.getElementById('offer-mo').classList.add('open');
+}
+
+function submitOffer(){
+  const price=document.getElementById('oprice').value;
+  if(!price){toast('希望価格を入力してください');return;}
+  document.getElementById('offer-mo').classList.remove('open');
+  toast('交渉を送りました！出品者からの返答をお待ちください。');
+}
+
+function showListing(){showPage('listing-page');}
+
+function onImgSelect(e){
+  uploadedFiles=[...uploadedFiles,...e.target.files].slice(0,4);
+  document.getElementById('ipv').innerHTML=uploadedFiles.map((f,i)=>{
+    const u=URL.createObjectURL(f);
+    return `<div class="ipv"><img src="${u}" alt=""><button class="ri" onclick="rmImg(${i})">×</button></div>`;
+  }).join('');
+}
+
+function rmImg(i){uploadedFiles.splice(i,1);document.getElementById('fii').value='';onImgSelect({target:{files:[]}});}
+
+async function submitListing(){
+  if(!user){openAuth();return;}
+  const title=document.getElementById('ltitle').value.trim();
+  const desc=document.getElementById('ldesc').value.trim();
+  const cat=document.getElementById('lcat').value;
+  const cond=document.getElementById('lcond').value;
+  const price=parseInt(document.getElementById('lprice').value);
+  const ship=document.getElementById('lship').checked;
+  if(!title||!cat||!cond||!price){toast('必須項目を入力してください');return;}
+  const btn=document.getElementById('lbtn');
+  btn.disabled=true;btn.textContent='出品中...';
+  try{
+    const urls=[];
+    for(const f of uploadedFiles){
+      const ext=f.name.split('.').pop();
+      const path=`${user.id}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const {error:ue}=await sb.storage.from('product-images').upload(path,f);
+      if(!ue){const {data:ud}=sb.storage.from('product-images').getPublicUrl(path);urls.push(ud.publicUrl);}
+    }
+    const {error}=await sb.from('products').insert({seller_id:user.id,title,description:desc,category:cat,condition:cond,price,shipping_included:ship,image_urls:urls,status:'販売中'});
+    if(error) throw error;
+    toast('✅ 出品しました！');
+    uploadedFiles=[];
+    document.getElementById('ipv').innerHTML='';
+    ['ltitle','ldesc','lprice'].forEach(id=>document.getElementById(id).value='');
+    ['lcat','lcond'].forEach(id=>document.getElementById(id).selectedIndex=0);
+    showList();loadProducts();
+  }catch(e){toast('出品に失敗しました: '+e.message);}
+  finally{btn.disabled=false;btn.textContent='出品する';}
+}
+
+function openAuth(){document.getElementById('auth-mo').classList.add('open');}
+function closeAuth(){document.getElementById('auth-mo').classList.remove('open');}
+
+function switchTab(mode){
+  authMode=mode;
+  document.getElementById('tab-in').classList.toggle('active',mode==='login');
+  document.getElementById('tab-up').classList.toggle('active',mode==='register');
+  document.getElementById('reg-fields').style.display=mode==='register'?'block':'none';
+  document.getElementById('a-btn').textContent=mode==='login'?'ログイン':'登録する';
+}
+
+async function submitAuth(){
+  const email=document.getElementById('a-email').value.trim();
+  const pass=document.getElementById('a-pass').value;
+  const btn=document.getElementById('a-btn');btn.disabled=true;
+  if(authMode==='register'){
+    const uname=document.getElementById('a-uname').value.trim();
+    if(!uname){toast('ユーザー名を入力してください');btn.disabled=false;return;}
+    const {data,error}=await sb.auth.signUp({email,password:pass});
+    if(error){toast(error.message);btn.disabled=false;return;}
+    if(data.user){
+      await sb.from('profiles').insert({id:data.user.id,username:uname,display_name:uname});
+      await setUser(data.user);
+    }
+    toast('✅ 登録完了！');closeAuth();
+  } else {
+    const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+    if(error){toast('ログインに失敗しました');btn.disabled=false;return;}
+    toast('✅ ログインしました');closeAuth();
+  }
+  btn.disabled=false;
+}
+
+async function doLogout(){await sb.auth.signOut();toast('ログアウトしました');showList();loadProducts();}
+function requireAuth(fn){if(!user){openAuth();return;}fn();}
+function toggleAv(){document.getElementById('av-menu')?.classList.toggle('open');}
+function closeAv(){document.getElementById('av-menu')?.classList.remove('open');}
+document.addEventListener('click',e=>{if(!e.target.closest('.av'))closeAv();});
+
+function showPage(id){
+  ['list-page','detail-page','listing-page','purchase-page'].forEach(p=>{
+    const el=document.getElementById(p);if(el)el.style.display='none';
+  });
+  const t=document.getElementById(id);
+  if(t)t.style.display=id==='list-page'?'flex':'block';
+  window.scrollTo(0,0);
+}
+function showList(){showPage('list-page');}
+function setCat(el,cat){document.querySelectorAll('.cat').forEach(c=>c.classList.remove('active'));el.classList.add('active');currentCat=cat;currentPage=1;loadProducts();}
+function setView(v){document.getElementById('gb').classList.toggle('active',v==='grid');document.getElementById('lb2').classList.toggle('active',v==='list');const lp=document.getElementById('list-page');if(v==='list')lp.classList.add('lm');else lp.classList.remove('lm');}
+function doSearch(){const q=document.getElementById('search-input').value.trim();if(!q){loadProducts();return;}searchQ(q);}
+async function searchQ(q){
+  document.getElementById('pg').innerHTML='<div class="loading">検索中...</div>';
+  const {data,count}=await sb.from('products').select('*,profiles(username,rating)',{count:'exact'}).eq('status','販売中').ilike('title',`%${q}%`).order('created_at',{ascending:false});
+  document.getElementById('rc').textContent=`「${q}」の検索結果 ${count||0}件`;
+  renderGrid(data||[]);
+}
+document.getElementById('search-input').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+document.getElementById('auth-mo').addEventListener('click',e=>{if(e.target===document.getElementById('auth-mo'))closeAuth();});
+document.getElementById('offer-mo').addEventListener('click',e=>{if(e.target===document.getElementById('offer-mo'))document.getElementById('offer-mo').classList.remove('open');});
+</script>
+</body>
+</html>
